@@ -1,0 +1,29 @@
+# Maven build artifacts
+**/target/
+target/
+
+# IDE specific files
+.idea/
+*.iml
+*.ipr
+*.iws
+.settings/
+.classpath
+.project
+.factorypath
+.springBeans
+.vscode/
+
+# Maven wrapper files (only wrapper jar is sometimes ignored, but if we want to keep it we can. Usually properties/scripts are tracked. Let's not ignore them as we need them for container build)
+#.mvn/
+#mvnw
+#mvnw.cmd
+
+# OS specific files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store
+
+# Logs
+*.log

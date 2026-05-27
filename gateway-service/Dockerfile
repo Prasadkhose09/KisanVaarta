@@ -1,29 +1,25 @@
-# Build stage
-FROM maven:3.9.8-eclipse-temurin-21-alpine AS build
+# Stage 1 — Build
+FROM eclipse-temurin:21-jdk-alpine AS builder
 WORKDIR /app
+COPY .mvn/ .mvn/
+COPY mvnw pom.xml ./
+RUN ./mvnw dependency:go-offline -q
+COPY src ./src
+RUN ./mvnw package -DskipTests -q
 
-# Copy parent and modules configuration to cache dependencies
-COPY pom.xml ./
-COPY gateway-service/pom.xml ./gateway-service/
-COPY price-service/pom.xml ./price-service/
-COPY ai-engine-service/pom.xml ./ai-engine-service/
-COPY notification-service/pom.xml ./notification-service/
+# Stage 2 — Extract layered JAR
+FROM eclipse-temurin:21-jdk-alpine AS extractor
+WORKDIR /app
+COPY --from=builder /app/target/*.jar app.jar
+RUN java -Djarmode=layertools -jar app.jar extract
 
-# Cache dependencies inside Docker build cache mount
-RUN --mount=type=cache,target=/root/.m2 mvn dependency:go-offline -B -DskipTests
-
-# Copy source files
-COPY gateway-service/src ./gateway-service/src
-COPY price-service/src ./price-service/src
-COPY ai-engine-service/src ./ai-engine-service/src
-COPY notification-service/src ./notification-service/src
-
-# Compile and package gateway-service
-RUN --mount=type=cache,target=/root/.m2 mvn clean package -pl gateway-service -am -DskipTests
-
-# Run stage
+# Stage 3 — Final minimal runtime image
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
-COPY --from=build /app/gateway-service/target/*.jar app.jar
-EXPOSE 8081
-ENTRYPOINT ["java", "-jar", "app.jar"]
+RUN addgroup -S kisan && adduser -S kisan -G kisan
+COPY --from=extractor /app/dependencies/ ./
+COPY --from=extractor /app/spring-boot-loader/ ./
+COPY --from=extractor /app/snapshot-dependencies/ ./
+COPY --from=extractor /app/application/ ./
+USER kisan
+ENTRYPOINT ["java", "org.springframework.boot.loader.launch.JarLauncher"]
