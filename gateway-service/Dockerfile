@@ -3,14 +3,19 @@ FROM eclipse-temurin:21-jdk-alpine AS builder
 WORKDIR /app
 COPY .mvn/ .mvn/
 COPY mvnw pom.xml ./
-RUN ./mvnw dependency:go-offline -q
-COPY src ./src
-RUN ./mvnw package -DskipTests -q
+COPY shared-events/ ./shared-events/
+COPY gateway-service/pom.xml ./gateway-service/
+COPY price-service/pom.xml ./price-service/
+COPY ai-engine-service/pom.xml ./ai-engine-service/
+COPY notification-service/pom.xml ./notification-service/
+COPY gateway-service/src ./gateway-service/src
+RUN ./mvnw install -pl shared-events -am -DskipTests -q
+RUN ./mvnw package -pl gateway-service -am -DskipTests -q
 
 # Stage 2 — Extract layered JAR
 FROM eclipse-temurin:21-jdk-alpine AS extractor
 WORKDIR /app
-COPY --from=builder /app/target/*.jar app.jar
+COPY --from=builder /app/gateway-service/target/*.jar app.jar
 RUN java -Djarmode=layertools -jar app.jar extract
 
 # Stage 3 — Final minimal runtime image

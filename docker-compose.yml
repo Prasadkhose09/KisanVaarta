@@ -73,22 +73,21 @@ services:
       kafka-broker:
         condition: service_healthy
 
-  init-kafka:
+  kafka-init:
     image: apache/kafka:3.7.0
-    container_name: init-kafka
+    container_name: kafka-init
+    depends_on:
+      - kafka-broker
     volumes:
       - ./init-kafka-topics.sh:/init-kafka-topics.sh
-    entrypoint: ["/bin/sh", "-c", "/init-kafka-topics.sh"]
-    networks:
-      - kisan-network
-    depends_on:
-      kafka-broker:
-        condition: service_healthy
+    command: ["bash", "/init-kafka-topics.sh"]
+    network_mode: service:kafka-broker
+    restart: on-failure
 
   gateway-service:
     build:
-      context: ./gateway-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: gateway-service/Dockerfile
     container_name: gateway-service
     ports:
       - "8081:8081"
@@ -110,8 +109,8 @@ services:
 
   price-service:
     build:
-      context: ./price-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: price-service/Dockerfile
     container_name: price-service
     ports:
       - "8082:8082"
@@ -133,8 +132,8 @@ services:
 
   ai-engine-service:
     build:
-      context: ./ai-engine-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ai-engine-service/Dockerfile
     container_name: ai-engine-service
     ports:
       - "8083:8083"
@@ -156,8 +155,8 @@ services:
 
   notification-service:
     build:
-      context: ./notification-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: notification-service/Dockerfile
     container_name: notification-service
     ports:
       - "8084:8084"

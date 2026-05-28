@@ -1,9 +1,9 @@
 server:
-  port: ${SERVER_PORT}
+  port: ${SERVER_PORT:8081}
 
 spring:
   application:
-    name: ${SPRING_APPLICATION_NAME}
+    name: ${SPRING_APPLICATION_NAME:gateway-service}
   
   datasource:
     url: ${SPRING_DATASOURCE_URL}
@@ -21,17 +21,27 @@ spring:
 
   data:
     redis:
-      host: ${SPRING_REDIS_HOST}
-      port: ${SPRING_REDIS_PORT}
-      password: ${SPRING_REDIS_PASSWORD}
+      host: ${SPRING_REDIS_HOST:localhost}
+      port: ${SPRING_REDIS_PORT:6379}
+      password: ${SPRING_REDIS_PASSWORD:kisanvaarta}
 
   kafka:
-    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS}
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     consumer:
-      group-id: ${SPRING_KAFKA_CONSUMER_GROUP_ID}
+      group-id: ${SPRING_KAFKA_CONSUMER_GROUP_ID:gateway-service-group}
       auto-offset-reset: earliest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        spring.json.add.type.headers: false
+
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+
+kafka:
+  topics:
+    farmer-queries: farmer-queries

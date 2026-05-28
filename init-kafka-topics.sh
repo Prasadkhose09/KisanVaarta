@@ -1,17 +1,32 @@
-#!/bin/sh
+#!/bin/bash
+set -e
 
-# Wait for the Kafka broker to be responsive
-echo "Waiting for Kafka to be ready..."
-until /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka-broker:29092 --list > /dev/null 2>&1; do
-  sleep 1
+KAFKA_BROKER="kafka:9092"
+PARTITIONS=3
+REPLICATION_FACTOR=1
+
+echo "Waiting for Kafka broker to be ready..."
+until /opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server $KAFKA_BROKER > /dev/null 2>&1; do
+  echo "Kafka not ready yet — retrying in 3 seconds..."
+  sleep 3
 done
 
-echo "Kafka is ready! Creating topics..."
+echo "Kafka is ready. Creating topics..."
 
-/opt/kafka/bin/kafka-topics.sh --create --bootstrap-server kafka-broker:29092 --replication-factor 1 --partitions 3 --topic farmer-queries --if-not-exists
-/opt/kafka/bin/kafka-topics.sh --create --bootstrap-server kafka-broker:29092 --replication-factor 1 --partitions 3 --topic price-responses --if-not-exists
-/opt/kafka/bin/kafka-topics.sh --create --bootstrap-server kafka-broker:29092 --replication-factor 1 --partitions 3 --topic ai-responses --if-not-exists
-/opt/kafka/bin/kafka-topics.sh --create --bootstrap-server kafka-broker:29092 --replication-factor 1 --partitions 3 --topic notification-events --if-not-exists
+TOPICS=("farmer-queries" "price-responses" "ai-responses" "notification-events")
 
-echo "Topics created successfully:"
-/opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka-broker:29092 --list
+for TOPIC in "${TOPICS[@]}"; do
+  if /opt/kafka/bin/kafka-topics.sh --bootstrap-server $KAFKA_BROKER --list | grep -q "^$TOPIC$"; then
+    echo "Topic '$TOPIC' already exists — skipping."
+  else
+    /opt/kafka/bin/kafka-topics.sh \
+      --bootstrap-server $KAFKA_BROKER \
+      --create \
+      --topic $TOPIC \
+      --partitions $PARTITIONS \
+      --replication-factor $REPLICATION_FACTOR
+    echo "Created topic: $TOPIC"
+  fi
+done
+
+echo "All topics ready."

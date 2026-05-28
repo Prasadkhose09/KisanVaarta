@@ -1,16 +1,16 @@
 server:
-  port: ${SERVER_PORT}
+  port: ${SERVER_PORT:8082}
 
 spring:
   application:
-    name: ${SPRING_APPLICATION_NAME}
-  
+    name: ${SPRING_APPLICATION_NAME:price-service}
+
   datasource:
     url: ${SPRING_DATASOURCE_URL}
     username: ${SPRING_DATASOURCE_USERNAME}
     password: ${SPRING_DATASOURCE_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
-  
+
   jpa:
     hibernate:
       ddl-auto: update
@@ -21,17 +21,32 @@ spring:
 
   data:
     redis:
-      host: ${SPRING_REDIS_HOST}
-      port: ${SPRING_REDIS_PORT}
-      password: ${SPRING_REDIS_PASSWORD}
+      host: ${REDIS_HOST:${SPRING_REDIS_HOST:localhost}}
+      port: ${SPRING_REDIS_PORT:6379}
+      password: ${SPRING_REDIS_PASSWORD:kisanvaarta}
 
   kafka:
-    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS}
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}}
     consumer:
-      group-id: ${SPRING_KAFKA_CONSUMER_GROUP_ID}
+      group-id: price-service-group
       auto-offset-reset: earliest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "com.kisanvaarta.shared.events"
+        spring.json.value.default.type: "com.kisanvaarta.shared.events.FarmerQueryEvent"
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        spring.json.add.type.headers: false
+
+kafka:
+  topics:
+    price-responses: price-responses
+
+mandi:
+  api:
+    base-url: https://api.data.gov.in/resource/9ef84268-d588-465a-a308-a864a43d0070
+    api-key: ${MANDI_API_KEY:579b464db66ec23bdd000001cdd3946e44ce4aad7209ff7b23ac571b}
+    cache-ttl-minutes: 30
