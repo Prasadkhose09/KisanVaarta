@@ -1,9 +1,9 @@
 version: '3.8'
 
 services:
-  mysql-db:
+  mysql:
     image: mysql:8.0
-    container_name: mysql-db
+    container_name: mysql
     ports:
       - "3307:3306"
     environment:
@@ -14,14 +14,15 @@ services:
     networks:
       - kisan-network
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "kisan", "-pkisan123"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 30s
 
-  redis-cache:
+  redis:
     image: redis:7.2-alpine
-    container_name: redis-cache
+    container_name: redis
     ports:
       - "6379:6379"
     command: redis-server --requirepass kisanvaarta
@@ -31,33 +32,34 @@ services:
       test: ["CMD", "redis-cli", "-a", "kisanvaarta", "ping"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
 
-  kafka-broker:
+  kafka:
     image: apache/kafka:3.7.0
-    container_name: kafka-broker
+    container_name: kafka
     ports:
       - "9092:9092"
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,CONTROLLER://0.0.0.0:9093,PLAINTEXT_HOST://0.0.0.0:9092
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-broker:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
-      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka-broker:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
-      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+    volumes:
+      - kafka-data:/var/lib/kafka/data
     networks:
       - kisan-network
     healthcheck:
-      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:29092 --list || exit 1"]
+      test: ["CMD", "/opt/kafka/bin/kafka-broker-api-versions.sh", "--bootstrap-server", "kafka:9092"]
       interval: 10s
-      timeout: 5s
-      retries: 5
+      timeout: 10s
+      retries: 10
+      start_period: 30s
 
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
@@ -66,22 +68,24 @@ services:
       - "8080:8080"
     environment:
       KAFKA_CLUSTERS_0_NAME: kisan-kafka
-      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka-broker:29092
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
     networks:
       - kisan-network
     depends_on:
-      kafka-broker:
+      kafka:
         condition: service_healthy
 
   kafka-init:
     image: apache/kafka:3.7.0
     container_name: kafka-init
     depends_on:
-      - kafka-broker
+      kafka:
+        condition: service_healthy
     volumes:
       - ./init-kafka-topics.sh:/init-kafka-topics.sh
     command: ["bash", "/init-kafka-topics.sh"]
-    network_mode: service:kafka-broker
+    networks:
+      - kisan-network
     restart: on-failure
 
   gateway-service:
@@ -98,11 +102,11 @@ services:
     env_file:
       - docker-compose.env
     depends_on:
-      mysql-db:
+      kafka-init:
+        condition: service_completed_successfully
+      mysql:
         condition: service_healthy
-      redis-cache:
-        condition: service_healthy
-      kafka-broker:
+      redis:
         condition: service_healthy
     networks:
       - kisan-network
@@ -121,11 +125,11 @@ services:
     env_file:
       - docker-compose.env
     depends_on:
-      mysql-db:
+      kafka-init:
+        condition: service_completed_successfully
+      mysql:
         condition: service_healthy
-      redis-cache:
-        condition: service_healthy
-      kafka-broker:
+      redis:
         condition: service_healthy
     networks:
       - kisan-network
@@ -144,11 +148,11 @@ services:
     env_file:
       - docker-compose.env
     depends_on:
-      mysql-db:
+      kafka-init:
+        condition: service_completed_successfully
+      mysql:
         condition: service_healthy
-      redis-cache:
-        condition: service_healthy
-      kafka-broker:
+      redis:
         condition: service_healthy
     networks:
       - kisan-network
@@ -167,11 +171,11 @@ services:
     env_file:
       - docker-compose.env
     depends_on:
-      mysql-db:
+      kafka-init:
+        condition: service_completed_successfully
+      mysql:
         condition: service_healthy
-      redis-cache:
-        condition: service_healthy
-      kafka-broker:
+      redis:
         condition: service_healthy
     networks:
       - kisan-network
@@ -180,3 +184,6 @@ networks:
   kisan-network:
     name: kisan-network
     driver: bridge
+
+volumes:
+  kafka-data:
